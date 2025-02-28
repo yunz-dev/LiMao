@@ -7,8 +7,8 @@ import (
 
 // HeartHandler checks if the server is running.
 func HeartHandler(w http.ResponseWriter, r *http.Request) {
-    w.WriteHeader(http.StatusOK) // Return status code 200 OK
-    fmt.Fprintf(w, "Server is up and running!") // Response message
+    w.WriteHeader(http.StatusNoContent) // Return status code 200 OK
+    fmt.Fprintf(w, "") // Response message
 }
 
 func main() {
