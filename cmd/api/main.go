@@ -3,6 +3,8 @@ package main
 import (
     "fmt"
     "net/http"
+    "flag"
+    "log"
 )
 
 // HeartHandler checks if the server is running.
@@ -12,6 +14,13 @@ func HeartHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+  	// Define command-line flag
+    dsn := flag.String("dsn", "", "Database connection string")
+    flag.Parse()
+
+    if *dsn == "" {
+      log.Fatal("Error: Database connection string is required. Use -dsn flag.")
+    }
     http.HandleFunc("/heart", HeartHandler)
 
     // Start the server
