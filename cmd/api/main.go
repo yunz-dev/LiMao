@@ -12,6 +12,9 @@ func HeartHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+  	staticDir := "../../web/static"
+	  fs := http.FileServer(http.Dir(staticDir))
+    http.Handle("/static/", http.StripPrefix("/static/", fs))
     http.HandleFunc("/heart", HeartHandler)
 
     // Start the server
