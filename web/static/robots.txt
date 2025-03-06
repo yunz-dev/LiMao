@@ -1,0 +1,8 @@
+User-agent: *
+Disallow: /admin/
+Disallow: /api/
+Disallow: /private/
+Disallow: /data/
+
+# Allow search engines to crawl public pages
+Allow: /
