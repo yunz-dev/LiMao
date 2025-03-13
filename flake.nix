@@ -1,6 +1,5 @@
 {
   inputs = {
-    # nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     systems.url = "github:nix-systems/default";
     treefmt-nix = {
       url = "github:numtide/treefmt-nix";
@@ -8,7 +7,6 @@
     };
   };
 
-  # Configure a binary cache for your executable(s).
   nixConfig = {
     extra-substituters =
       [
@@ -33,7 +31,6 @@
       treefmtEval = eachSystem (pkgs: treefmt-nix.lib.evalModule pkgs ./treefmt.nix);
     in
     {
-      # Build executables. See https://nixos.org/manual/nixpkgs/stable/#sec-language-go
       packages = eachSystem (pkgs: {
         # default = pkgs.buildGoModule {
         #   pname = "hello";
