@@ -13,12 +13,20 @@
       devShells = eachSystem (pkgs: {
         default = pkgs.mkShell {
           buildInputs = [
-            pkgs.python3
-            pkgs.python312Packages.pip
-            pkgs.tailwindcss
-          ];
+            pkgs.nodejs
 
-          shellHook = '''';
+            # You can set the major version of Node.js to a specific one instead
+            # of the default version
+            # pkgs.nodejs-22_x
+
+            # Comment out one of these to use an alternative package manager.
+            pkgs.yarn
+            pkgs.pnpm
+            pkgs.bun
+
+            pkgs.nodePackages.typescript
+            pkgs.nodePackages.typescript-language-server
+          ];
         };
       });
     };
