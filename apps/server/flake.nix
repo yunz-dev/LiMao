@@ -15,10 +15,11 @@
           buildInputs = [
             pkgs.python3
             pkgs.python312Packages.pip
-            pkgs.tailwindcss
           ];
 
-          shellHook = '''';
+          shellHook = ''
+            echo "Welcome to LiMao Server"
+          '';
         };
       });
     };

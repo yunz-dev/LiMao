@@ -1,61 +1,33 @@
 {
   inputs = {
+    # nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     systems.url = "github:nix-systems/default";
-    treefmt-nix = {
-      url = "github:numtide/treefmt-nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-  };
-
-  nixConfig = {
-    extra-substituters =
-      [
-      ];
-    extra-trusted-public-keys =
-      [
-      ];
   };
 
   outputs =
-    {
-      self,
-      systems,
-      nixpkgs,
-      treefmt-nix,
-      ...
-    }:
+    { systems, nixpkgs, ... }@inputs:
     let
-      inherit (nixpkgs) lib;
-      eachSystem = f: lib.genAttrs (import systems) (system: f nixpkgs.legacyPackages.${system});
-
-      treefmtEval = eachSystem (pkgs: treefmt-nix.lib.evalModule pkgs ./treefmt.nix);
+      eachSystem = f: nixpkgs.lib.genAttrs (import systems) (system: f nixpkgs.legacyPackages.${system});
     in
     {
-      packages = eachSystem (pkgs: {
-        # default = pkgs.buildGoModule {
-        #   pname = "hello";
-        #   version = builtins.substring 0 8 (self.lastModifiedDate or "19700101");
-        #   src = self.outPath;
-        #   vendorHash = lib.fakeHash;
-        #   meta = { };
-        # };
-      });
-
       devShells = eachSystem (pkgs: {
         default = pkgs.mkShell {
-          packages = [
-            pkgs.go
-            pkgs.gopls
-            pkgs.gnumake
-            pkgs.mysql84
+          buildInputs = [
+            pkgs.nodejs
+
+            # You can set the major version of Node.js to a specific one instead
+            # of the default version
+            # pkgs.nodejs-22_x
+
+            # Comment out one of these to use an alternative package manager.
+            pkgs.yarn
+            pkgs.pnpm
+            pkgs.bun
+
+            pkgs.nodePackages.typescript
+            pkgs.nodePackages.typescript-language-server
           ];
         };
-      });
-
-      formatter = eachSystem (pkgs: treefmtEval.${pkgs.system}.config.build.wrapper);
-
-      checks = eachSystem (pkgs: {
-        formatting = treefmtEval.${pkgs.system}.config.build.check self;
       });
     };
 }
