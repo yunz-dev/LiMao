@@ -5,7 +5,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ValidationError
 
-from supabase import Client, create_client
+from supabase import Client
+from utils import setup_supabase_client
 
 
 def main():
@@ -88,22 +89,6 @@ def parse_chinese_entry(entry_str: str) -> Optional[ChineseEntry]:
     except ValidationError as e:
         print(f"Data failed validation: {e}")
         return None
-
-
-def setup_supabase_client() -> Client:
-    """
-    Initializes and returns the Supabase client using environment variables.
-    """
-    print("setting up supabase client...")
-    supabase_url = os.environ.get("SUPABASE_URL")
-    supabase_key = os.environ.get("SUPABASE_KEY")
-
-    if not supabase_url or not supabase_key:
-        raise ValueError(
-            "SUPABASE_URL and SUPABASE_KEY must be set in your environment."
-        )
-
-    return create_client(supabase_url, supabase_key)
 
 
 def upsert_chinese_entry(supabase: Client, entry: ChineseEntry) -> dict:
