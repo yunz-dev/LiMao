@@ -2,6 +2,12 @@
 
 This service handles all heavy-duty Natural Language Processing (NLP) for the LiMao project. Its sole responsibility is to receive requests to process new media, perform a vocabulary frequency analysis, and populate the database.
 
+## Contributing:
+- All new functions/endpoints should have accompanying tests
+- make sure they pass the workflows before making a pr by running:
+    - linter: `ruff check .`
+    - test: `pytest`
+
 ## Local Setup & Installation
 
 1.  **Clone the repository:**
