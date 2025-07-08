@@ -1,2 +1,7 @@
-cedict_ts.u8
-JMdict
+# Python
+__pycache__
+
+# Dictionaries
+cedict*
+JMdict*
+kedict*
