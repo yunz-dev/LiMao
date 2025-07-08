@@ -255,3 +255,20 @@ def setup_supabase_client() -> Client:
             spinner_style="green",
         )
         return create_client(supabase_url, supabase_key)
+
+
+def log_config_loaded(
+    source: str, protocol: str, file_type: str, zip_type: str,
+    file_name: str, interval: int, upsert: bool
+):
+    """
+    Logs the config being loaded
+    """
+    console.log("[bold magenta]Configuration loaded:[/bold magenta]")
+    console.log(f"  [cyan]Source:[/cyan] {source}")
+    console.log(f"  [cyan]Protocol:[/cyan] {protocol}")
+    console.log(f"  [cyan]File Type:[/cyan] {file_type}")
+    console.log(f"  [cyan]Zip Type:[/cyan] {zip_type}")
+    console.log(f"  [cyan]Local File Name:[/cyan] {file_name}")
+    console.log(f"  [cyan]Processing Interval:[/cyan] {interval}")
+    console.log(f"  [cyan]Upsert to DB:[/cyan] {upsert}")
