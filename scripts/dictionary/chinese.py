@@ -3,61 +3,352 @@ import os
 import re
 from typing import List, Optional
 
+from config import ChineseScraper
 from pydantic import BaseModel, ValidationError
+from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    Progress,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
+from rich.prompt import Confirm
+
+# No need to import Status if we're not using it transiently for each upsert
+# from rich.status import Status
+from utils import download_file, setup_supabase_client, unzip_gz_file
 
 from supabase import Client
-from utils import setup_supabase_client
+
+# Initialize the Rich Console for all output
+console = Console()
 
 
 def main():
     """
-    Main function to parse arguments and process the file.
+    Main function to orchestrate the scraping, unzipping, and parsing process
+    based on the configuration defined in ChineseScraper.
     """
-    parser = argparse.ArgumentParser(
-        description="A script to parse entries from the CC-CEDICT and update supabase database with entries"
+    console.rule("[bold blue]Starting Chinese Scraper[/bold blue]")
+
+    # Unpack configuration settings
+    try:
+        config_values = ChineseScraper.model_dump()
+        source = config_values.get("source")
+        protocol = config_values.get("protocol")
+        file_type = config_values.get("file_type")
+        zip_type = config_values.get("zip_type")
+        file_name = config_values.get("file_name")
+        interval = config_values.get("interval")
+        upsert = config_values.get("upsert")
+
+        console.log(f"[bold magenta]Configuration loaded:[/bold magenta]")
+        console.log(f"  [cyan]Source:[/cyan] {source}")
+        console.log(f"  [cyan]Protocol:[/cyan] {protocol}")
+        console.log(f"  [cyan]File Type:[/cyan] {file_type}")
+        console.log(f"  [cyan]Zip Type:[/cyan] {zip_type}")
+        console.log(f"  [cyan]Local File Name:[/cyan] {file_name}")
+        console.log(f"  [cyan]Processing Interval:[/cyan] {interval}")
+        console.log(f"  [cyan]Upsert to DB:[/cyan] {upsert}")
+
+    except Exception as e:
+        console.log(
+            f"[bold red]Error loading configuration:[/bold red] {e}", style="red"
+        )
+        console.log(
+            "[bold red]Exiting due to configuration error.[/bold red]", style="red"
+        )
+        exit(1)
+
+    # --- Step 1: Download the file ---
+    console.log(
+        "\n[bold yellow]Step 1:[/bold yellow] [bold blue]Downloading file...[/bold blue]"
     )
+    downloaded_path = None
+    if protocol == "http":
+        downloaded_path = download_file(
+            source, f"{file_name}.gz" if zip_type == "gz" else file_name
+        )
+    elif protocol == "ftp":
+        # Using the placeholder for FTP. You'd need to uncomment and ensure download_file_ftp exists in utils
+        # from utils import download_file_ftp
+        # downloaded_path = download_file_ftp(source, f"{file_name}.gz" if zip_type == "gz" else file_name)
+        console.log(
+            "[bold red]Error:[/bold red] FTP protocol support is currently commented out or not fully implemented.",
+            style="red",
+        )
+    else:
+        console.log(
+            f"[bold red]Error:[/bold red] Unsupported protocol '{protocol}'. Only 'http' (and 'ftp' placeholder) are supported.",
+            style="red",
+        )
+        console.log(
+            "[bold red]Exiting due to unsupported protocol.[/bold red]", style="red"
+        )
+        exit(1)
 
-    parser.add_argument("filepath", help="Path to CCEDICT file... e.g ./cedict_ts.u8")
+    if not downloaded_path:
+        console.log("[bold red]File download failed. Exiting.[/bold red]", style="red")
+        exit(1)
 
-    args = parser.parse_args()
+    # --- Step 2: Unzip the file if necessary ---
+    unzipped_path = downloaded_path
+    if zip_type == "gz":
+        console.log(
+            "\n[bold yellow]Step 2:[/bold yellow] [bold blue]Unzipping file...[/bold blue]"
+        )
+        unzipped_path = unzip_gz_file(downloaded_path)
+        if not unzipped_path:
+            console.log(
+                "[bold red]File unzipping failed. Exiting.[/bold red]", style="red"
+            )
+            os.remove(downloaded_path)  # Clean up downloaded .gz file
+            exit(1)
+        # Clean up the .gz file after successful unzipping
+        try:
+            os.remove(downloaded_path)
+            console.log(
+                f"[bold green]Cleaned up:[/bold green] Removed original .gz file: [dim]{downloaded_path}[/dim]"
+            )
+        except OSError as e:
+            console.log(
+                f"[bold orange3]Warning:[/bold orange3] Could not remove {downloaded_path}: {e}",
+                style="orange3",
+            )
+    elif zip_type != "none":
+        console.log(
+            f"[bold red]Error:[/bold red] Unsupported zip type '{zip_type}'. Only 'gz' or 'none' are supported.",
+            style="red",
+        )
+        console.log(
+            "[bold red]Exiting due to unsupported zip type.[/bold red]", style="red"
+        )
+        exit(1)
+    else:
+        console.log(
+            "\n[bold yellow]Step 2:[/bold yellow] [bold blue]No unzipping required (zip_type='none').[/bold blue]"
+        )
 
-    file_path = args.filepath
-    print(f"Attempting to process file: {file_path}")
+    # --- Step 3: Parse and upsert data ---
+    console.log(
+        "\n[bold yellow]Step 3:[/bold yellow] [bold blue]Parsing file and upserting data...[/bold blue]"
+    )
+    if file_type == "txt":
+        parse_chinese_txt(upsert, interval, unzipped_path)
+    else:
+        console.log(
+            f"[bold red]Error:[/bold red] Unsupported file type '{file_type}'. Only 'txt' is supported for parsing.",
+            style="red",
+        )
+        console.log(
+            "[bold red]Exiting due to unsupported file type.[/bold red]", style="red"
+        )
+        exit(1)
 
+    console.rule("[bold blue]Chinese Scraper Finished[/bold blue]")
+
+
+def parse_chinese_txt(upsert: bool, interval: int, file_path: str):
+    """
+    Parses a Chinese dictionary text file, previews content, and optionally
+    upserts entries into a Supabase database.
+
+    Args:
+        upsert (bool): If True, upserts parsed entries into the database.
+        interval (int): Only process and (if upsert is True) upsert every `interval` lines.
+        file_path (str): The path to the text file to parse.
+    """
     if not os.path.exists(file_path):
-        print(f"Error: The file '{file_path}' was not found.")
+        console.log(
+            f"[bold red]Error:[/bold red] The file '[yellow]{file_path}[/yellow]' was not found.",
+            style="red",
+        )
         return
 
+    # --- File preview and confirmation ---
+    console.log(
+        f"\n[bold yellow]Previewing file:[/bold yellow] [green]{file_path}[/green]"
+    )
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             for i, line in enumerate(f):
-                if i < 15:
-                    print(f"Line {i+1}: {line.strip()}")
-            if i >= 15:
-                print("...")
-            response = input("Does this file look correct? (Y/n) ")
-            if response.lower() == "n" or response.lower() == "no":
-                print("exiting...")
+                if i < 15:  # Displaying first 15 lines
+                    console.log(f"[dim]Line {i+1}:[/dim] {line.strip()}", style="dim")
+                else:
+                    console.log("[dim]... (truncated)[/dim]", style="dim")
+                    break  # Stop reading after 15 lines for preview
+
+            # Use rich.prompt.Confirm for a better interactive experience
+            response = Confirm.ask(
+                "[bold yellow]Does this file look correct?[/bold yellow]"
+            )
+            if not response:
+                console.log(
+                    "[bold red]Operation cancelled by user. Exiting.[/bold red]",
+                    style="red",
+                )
                 exit()
     except Exception as e:
-        print(f"An error occurred while reading the file: {e}")
+        console.log(
+            f"[bold red]An error occurred while reading the file for preview:[/bold red] {e}",
+            style="red",
+        )
+        return
+
+    # --- Main parsing and upserting loop ---
+    console.log("\n[bold blue]Starting parsing and (optional) upserting...[/bold blue]")
+    client = None
+    if upsert:
+        try:
+            # setup_supabase_client already uses rich.status.Status so it's good
+            client = setup_supabase_client()
+        except ValueError as e:
+            console.log(f"[bold red]Supabase setup failed:[/bold red] {e}", style="red")
+            console.log(
+                "[bold red]Cannot proceed with upserting. Exiting.[/bold red]",
+                style="red",
+            )
+            exit(1)
+
+    processed_count = 0
+    upserted_count = 0
+    skipped_count = 0
+    parse_errors = 0
+
     try:
         with open(file_path, "r", encoding="utf-8") as f:
-            client = setup_supabase_client()
-            for i, line in enumerate(f):
-                if line[0] == "#":
-                    continue
-                else:
-                    entry = parse_chinese_entry(line)
-                    upsert_chinese_entry(client, entry)
-                    if i % 1000 == 0:
-                        print("adding", i)
+            # Get total lines for an accurate progress bar
+            total_lines = sum(1 for _ in f)
+            f.seek(0)  # Reset file pointer to the beginning
+
+            with Progress(
+                TextColumn(
+                    "[bold green]{task.description}[/bold green]", justify="right"
+                ),
+                BarColumn(bar_width=None),
+                "[progress.percentage]{task.percentage:>3.1f}%",
+                "•",
+                TextColumn("Processed: {task.fields[processed_count]}"),
+                "•",
+                TextColumn("Upserted: {task.fields[upserted_count]}"),
+                "•",
+                TextColumn("Skipped: {task.fields[skipped_count]}"),
+                "•",
+                TextColumn("Parse Errors: {task.fields[parse_errors]}"),
+                "•",
+                TimeElapsedColumn(),
+                "•",
+                TimeRemainingColumn(),
+                console=console,
+            ) as progress:
+                parsing_task = progress.add_task(
+                    "[white]Parsing entries...",
+                    total=total_lines,
+                    processed_count=processed_count,
+                    upserted_count=upserted_count,
+                    skipped_count=skipped_count,
+                    parse_errors=parse_errors,
+                )
+
+                for i, line in enumerate(f):
+                    progress.update(parsing_task, advance=1)
+                    processed_count += 1
+
+                    if line.strip().startswith("#"):  # Skip comment lines
+                        skipped_count += 1
+                        progress.update(parsing_task, skipped_count=skipped_count)
+                        continue
+
+                    if i % interval == 0:
+                        entry = parse_chinese_entry(line)
+                        if entry:
+                            if upsert and client:
+                                # Removed the transient Status here.
+                                # The main progress bar will handle the overall visual update.
+                                response = upsert_chinese_entry(client, entry)
+                                if response:
+                                    upserted_count += 1
+                                else:
+                                    # Log a warning if upsert fails, but don't disrupt progress bar
+                                    console.log(
+                                        f"[bold red]Upsert failed for:[/bold red] [dim]'{entry.traditional}'[/dim]",
+                                        style="red",
+                                        justify="left",
+                                    )
+                                    parse_errors += 1  # Count failed upserts as errors for reporting
+                            else:
+                                # Count as skipped if not upserting or client not available
+                                skipped_count += 1
+                            progress.update(
+                                parsing_task,
+                                upserted_count=upserted_count,
+                                parse_errors=parse_errors,
+                            )
+                        else:
+                            parse_errors += 1
+                            progress.update(parsing_task, parse_errors=parse_errors)
+                            console.log(
+                                f"[bold orange3]Warning:[/bold orange3] Failed to parse line {i+1}: '[dim]{line.strip()}[/dim]'",
+                                style="orange3",
+                            )
+                    else:
+                        skipped_count += 1  # Count as skipped if not within interval
+                        progress.update(parsing_task, skipped_count=skipped_count)
+
+                # Final update for the progress bar fields to ensure they reflect final counts
+                progress.update(
+                    parsing_task,
+                    completed=total_lines,
+                    processed_count=processed_count,
+                    upserted_count=upserted_count,
+                    skipped_count=skipped_count,
+                    parse_errors=parse_errors,
+                )
+
+        console.log(f"\n[bold green]Parsing and upserting complete![/bold green]")
+        console.log(
+            f"  [white]Total lines processed:[/white] [cyan]{processed_count}[/cyan]"
+        )
+        console.log(
+            f"  [white]Entries upserted:[/white] [green]{upserted_count}[/green]"
+        )
+        console.log(
+            f"  [white]Lines skipped (comments/interval):[/white] [yellow]{skipped_count}[/yellow]"
+        )
+        console.log(
+            f"  [white]Lines with parsing errors or failed upserts:[/white] [red]{parse_errors}[/red]"
+        )
+
+    except FileNotFoundError:
+        console.log(
+            f"[bold red]Error:[/bold red] The file '{file_path}' was not found during parsing.",
+            style="red",
+        )
     except Exception as e:
-        print(f"An error occurred while reading the file: {e}")
+        console.log(
+            f"[bold red]An unexpected error occurred during parsing:[/bold red] {e}",
+            style="red",
+        )
+        # To get more detail, you could print the full traceback:
+        # console.print_exception(show_locals=True)
+    finally:
+        # Clean up the unzipped file
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                console.log(
+                    f"[bold green]Cleaned up:[/bold green] Removed unzipped file: [dim]{file_path}[/dim]"
+                )
+            except OSError as e:
+                console.log(
+                    f"[bold orange3]Warning:[/bold orange3] Could not remove {file_path}: {e}",
+                    style="orange3",
+                )
 
 
 class ChineseEntry(BaseModel):
-    """A Pydantic model for a Chinese dictionary entry."""
+    """A Pydantic model for a Chinese dictionary entry, representing its structure."""
 
     traditional: str
     simplified: str
@@ -67,12 +358,16 @@ class ChineseEntry(BaseModel):
 
 def parse_chinese_entry(entry_str: str) -> Optional[ChineseEntry]:
     """
-    Parses a string containing Chinese word data into a Pydantic model.
+    Parses a single string line containing Chinese word data into a ChineseEntry Pydantic model.
+    Expected format: Traditional Simplified [Pronunciation] /Definition 1/Definition 2/
+    Example: 憂鬱 忧郁 [you1 yu4] /melancholy/dejected/depressed/
     """
     pattern = re.compile(r"(\S+)\s+(\S+)\s+\[(.*?)\]\s+\/(.*)\/")
     match = pattern.match(entry_str.strip())
 
     if not match:
+        # This function is called within a loop that tracks errors, so no console.log here.
+        # The calling function handles logging the parsing error.
         return None
 
     traditional, simplified, pronunciation, defs_string = match.groups()
@@ -87,7 +382,8 @@ def parse_chinese_entry(entry_str: str) -> Optional[ChineseEntry]:
         )
         return entry_object
     except ValidationError as e:
-        print(f"Data failed validation: {e}")
+        # This function is called within a loop that tracks errors, so no console.log here.
+        # The calling function handles logging the validation error.
         return None
 
 
@@ -102,7 +398,8 @@ def upsert_chinese_entry(supabase: Client, entry: ChineseEntry) -> dict:
         entry: An instance of the ChineseEntry Pydantic model.
 
     Returns:
-        The data of the upserted record from the database.
+        dict: The data of the upserted record from the database if successful,
+              an empty dictionary otherwise.
     """
     try:
         # Convert the Pydantic model to a dictionary before sending to Supabase
@@ -112,16 +409,19 @@ def upsert_chinese_entry(supabase: Client, entry: ChineseEntry) -> dict:
         response = supabase.table("chinese_entries").upsert(entry_dict).execute()
 
         if response.data:
-            # print(
-            #     f"Successfully upserted: ('{entry.traditional}', '{entry.simplified}')"
-            # )
+            # This function is called inside a Progress bar loop,
+            # so direct console.log for success is usually avoided to prevent output flickering.
             return response.data[0]
         else:
-            # print("Upsert successful, but no data returned.")
+            # In cases where no data is returned but no error is raised by Supabase,
+            # it indicates a successful operation but no new row was created/updated.
+            # (e.g., if the data was identical and Supabase optimises the upsert)
             return {}
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        # Error messages for upsert failures are now logged from the calling function (parse_chinese_txt)
+        # to ensure they appear without interfering with the progress bar.
+        # We simply return an empty dict to signal failure.
         return {}
 
 
