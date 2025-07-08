@@ -17,5 +17,6 @@ default config should look something like this:
 SUPABASE_URL=http://127.0.0.1:54321
 SUPABASE_KEY=ADD_YOUR_OWN_SUPABASE_SERVICE_ROLE_KEY_HERE
 ```
-- run `python3 main.py` in `/scripts/dictionary` in order to populate the database
+- run `pip install -r requirements.txt` and `python3 main.py` in `/scripts/dictionary` in order to populate the database
 - yipeee
+- you can find the database at `http://localhost:54323` (typically)
