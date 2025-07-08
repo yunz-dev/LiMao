@@ -16,7 +16,7 @@ from rich.progress import (
 )
 from rich.prompt import Confirm
 from rich.status import Status
-from utils import download_file_ftp, setup_supabase_client, unzip_gz_file
+from utils import download_file_ftp, setup_supabase_client, unzip_gz_file, log_config_loaded
 
 from supabase import Client
 
@@ -44,15 +44,7 @@ def main():
         interval = config_values.get("interval")
         upsert = config_values.get("upsert")
 
-        console.log("[bold magenta]Configuration loaded:[/bold magenta]")
-        console.log(f"  [cyan]Source:[/cyan] {source}")
-        console.log(f"  [cyan]Protocol:[/cyan] {protocol}")
-        console.log(f"  [cyan]File Type:[/cyan] {file_type}")
-        console.log(f"  [cyan]Zip Type:[/cyan] {zip_type}")
-        console.log(f"  [cyan]Local File Name:[/cyan] {file_name}")
-        console.log(f"  [cyan]Processing Interval:[/cyan] {interval}")
-        console.log(f"  [cyan]Upsert to DB:[/cyan] {upsert}")
-
+        log_config_loaded(source, protocol, file_type, zip_type, file_name, interval, upsert)
     except Exception as e:
         console.log(
             f"[bold red]Error loading configuration:[/bold red] {e}", style="red"
