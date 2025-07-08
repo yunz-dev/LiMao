@@ -1,4 +1,3 @@
-import argparse
 import os
 import re
 from typing import List, Optional
@@ -43,7 +42,7 @@ def main():
         interval = config_values.get("interval")
         upsert = config_values.get("upsert")
 
-        console.log(f"[bold magenta]Configuration loaded:[/bold magenta]")
+        console.log("[bold magenta]Configuration loaded:[/bold magenta]")
         console.log(f"  [cyan]Source:[/cyan] {source}")
         console.log(f"  [cyan]Protocol:[/cyan] {protocol}")
         console.log(f"  [cyan]File Type:[/cyan] {file_type}")
@@ -306,7 +305,7 @@ def parse_chinese_txt(upsert: bool, interval: int, file_path: str):
                     parse_errors=parse_errors,
                 )
 
-        console.log(f"\n[bold green]Parsing and upserting complete![/bold green]")
+        console.log("\n[bold green]Parsing and upserting complete![/bold green]")
         console.log(
             f"  [white]Total lines processed:[/white] [cyan]{processed_count}[/cyan]"
         )
@@ -381,7 +380,7 @@ def parse_chinese_entry(entry_str: str) -> Optional[ChineseEntry]:
             definitions=definitions,
         )
         return entry_object
-    except ValidationError as e:
+    except ValidationError:
         # This function is called within a loop that tracks errors, so no console.log here.
         # The calling function handles logging the validation error.
         return None
@@ -418,7 +417,7 @@ def upsert_chinese_entry(supabase: Client, entry: ChineseEntry) -> dict:
             # (e.g., if the data was identical and Supabase optimises the upsert)
             return {}
 
-    except Exception as e:
+    except Exception:
         # Error messages for upsert failures are now logged from the calling function (parse_chinese_txt)
         # to ensure they appear without interfering with the progress bar.
         # We simply return an empty dict to signal failure.

@@ -26,7 +26,6 @@ from utils import (
 
 from supabase import (
     Client,
-    create_client,
 )  # Keep create_client for setup_supabase_client internally
 
 # Initialize the Rich Console for all output
@@ -51,7 +50,7 @@ def main():
         interval = config_values.get("interval")
         upsert = config_values.get("upsert")
 
-        console.log(f"[bold magenta]Configuration loaded:[/bold magenta]")
+        console.log("[bold magenta]Configuration loaded:[/bold magenta]")
         console.log(f"  [cyan]Source:[/cyan] {source}")
         console.log(f"  [cyan]Protocol:[/cyan] {protocol}")
         console.log(f"  [cyan]File Type:[/cyan] {file_type}")
@@ -430,7 +429,7 @@ def parse_korean_yml(upsert: bool, interval: int, file_path: str):
 
     total_entries = len(yaml_data)
     console.log(
-        f"\n[bold blue]Starting parsing and (optional) upserting...[/bold blue]"
+        "\n[bold blue]Starting parsing and (optional) upserting...[/bold blue]"
     )
 
     with Progress(
@@ -547,7 +546,7 @@ def parse_korean_yml(upsert: bool, interval: int, file_path: str):
         )
 
     # Final Summary (consistent with Chinese output)
-    console.log(f"\n[bold green]Parsing and upserting complete![/bold green]")
+    console.log("\n[bold green]Parsing and upserting complete![/bold green]")
     console.log(
         f"  [white]Total entries processed:[/white] [cyan]{total_entries}[/cyan]"
     )

@@ -9,7 +9,7 @@ class DictionaryScraper(BaseModel):
     file_type: str  # txt, xml, yml... etc
     zip_type: str  # zip, gzip etc
     file_name: str
-    interval: int = 1  # for dev
+    interval: int = 1  # change to a bigger number for dev
     upsert: bool = True  # for dev
 
 
@@ -19,7 +19,7 @@ ChineseScraper = DictionaryScraper(
     file_type="txt",
     zip_type="gz",
     file_name="cedict_1_0_ts_utf-8_mdbg.txt",
-    interval=100,  # for dev
+    interval=1,
     upsert=True,
 )
 
@@ -29,7 +29,7 @@ JapaneseScraper = DictionaryScraper(
     file_type="xml",
     zip_type="gz",
     file_name="JMdict_e",
-    interval=500,  # for dev
+    interval=1,
     upsert=True,
 )
 
@@ -39,6 +39,6 @@ KoreanScraper = DictionaryScraper(
     file_type="yml",
     zip_type="none",
     file_name="kedict.yml",
-    interval=500,  # for dev
+    interval=1,
     upsert=True,
 )
