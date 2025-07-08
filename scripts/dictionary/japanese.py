@@ -1,13 +1,13 @@
 import argparse
 import os
 from typing import List, Optional
+from xml.etree import ElementTree as ET
+from xml.etree.ElementTree import Element
 
-import xml.etree.ElementTree as ET
-import xml.etree.ElementTree.Element as Element
 from pydantic import BaseModel, ValidationError
+from utils import setup_supabase_client
 
 from supabase import Client
-from utils import setup_supabase_client
 
 CODEC = "utf-8"
 
@@ -40,7 +40,7 @@ def main():
             if i >= 15:
                 print("...")
             response = input("Does this file look correct? (Y/n) ")
-            response = 'y'
+            response = "y"
             if response.lower() in ("n", "no"):
                 print("exiting...")
                 exit()
@@ -57,7 +57,10 @@ def main():
                 upsert_japanese_entry(client, entry)
             if i == 0:
                 perc += 1
-                print("\r[" + "-" * (perc // 2) + " " * (50 - perc // 2) + f"] {perc}%", end="")
+                print(
+                    "\r[" + "-" * (perc // 2) + " " * (50 - perc // 2) + f"] {perc}%",
+                    end="",
+                )
             i = (i + 1) % n
         print("\rFinished adding all entries." + " " * 35)
     except Exception as e:
@@ -96,7 +99,10 @@ def parse_definitions(senses: List[Element]) -> List[str]:
     definitions = []
     for sense in senses:
         gloss = sense.find("gloss")
-        if gloss is None or gloss.attrib.get("{http://www.w3.org/XML/1998/namespace}lang") != "eng":
+        if (
+            gloss is None
+            or gloss.attrib.get("{http://www.w3.org/XML/1998/namespace}lang") != "eng"
+        ):
             continue
         definition = gloss.text
         poses = sense.findall("pos")
@@ -114,7 +120,7 @@ def parse_japanese_entry(entry) -> Optional[List[JapaneseEntry]]:
     Parses an entry containing Japanese word data into a Pydantic model.
     """
     kebs = parse_kebs(entry.findall("k_ele"))
-    readings = parse_readings(entry.findall('r_ele'))
+    readings = parse_readings(entry.findall("r_ele"))
     definitions = parse_definitions(entry.findall("sense"))
 
     res = []
@@ -124,13 +130,10 @@ def parse_japanese_entry(entry) -> Optional[List[JapaneseEntry]]:
         readings = None
 
     for i, keb in enumerate(kebs):
-        alts = kebs[:i] + kebs[i+1:] or None
+        alts = kebs[:i] + kebs[i + 1 :] or None
         try:
             mod = JapaneseEntry(
-                word=keb,
-                readings=readings,
-                alt_forms=alts,
-                definitions=definitions
+                word=keb, readings=readings, alt_forms=alts, definitions=definitions
             )
         except ValidationError as e:
             print(f"Data failed validation: {e}")
@@ -156,8 +159,7 @@ def upsert_japanese_entry(supabase: Client, entry: JapaneseEntry) -> dict:
         entry_dict = entry.model_dump()
 
         # The .upsert() method handles the INSERT or UPDATE logic automatically
-        response = supabase.table(
-            "japanese_entries").upsert(entry_dict).execute()
+        response = supabase.table("japanese_entries").upsert(entry_dict).execute()
 
         if response.data:
             # print(
