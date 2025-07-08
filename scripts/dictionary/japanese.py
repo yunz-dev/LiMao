@@ -4,8 +4,9 @@ from typing import List, Optional
 from xml.etree import ElementTree as ET
 from xml.etree.ElementTree import Element
 
+from config import JapaneseScraper
 from pydantic import BaseModel, ValidationError
-from utils import setup_supabase_client
+from utils import download_file_ftp, setup_supabase_client, unzip_gz_file
 
 from supabase import Client
 
@@ -13,20 +14,33 @@ CODEC = "utf-8"
 
 
 def main():
+    config_values = JapaneseScraper.model_dump()
+    source = config_values.get("source")
+    protocol = config_values.get("protocol")
+    file_type = config_values.get("file_type")
+    zip_type = config_values.get("zip_type")
+    file_name = config_values.get("file_name")
+    interval = config_values.get("interval")
+    upsert = config_values.get("upsert")
+
+    if protocol == "ftp":
+        download_file_ftp(source)
+    else:
+        exit(1)
+
+    if zip_type == "gz":
+        unzip_gz_file(f"./{file_name}.gz")
+    else:
+        exit(1)
+    if file_type == "xml":
+        parse_japanese_xml(upsert, interval, f"./{file_name}")
+
+
+def parse_japanese_xml(upsert: bool, interval: int, file_path: str):
     """
     Main function to parse arguments and process the file.
     """
-    parser = argparse.ArgumentParser(
-        description="A script to parse entries from the JMDICT file and update supabase database with entries"
-    )
-
-    parser.add_argument("filepath", help="Path to JMDICT file... e.g ./JMDICT")
-
-    args = parser.parse_args()
-
-    file_path = args.filepath
     print(f"Attempting to process file: {file_path}")
-
     if not os.path.exists(file_path):
         print(f"Error: The file '{file_path}' was not found.")
         exit(1)
@@ -50,11 +64,14 @@ def main():
         print(f"{len(entries_list)} entries found.")
         n = len(entries_list) // 100
         i = 0
+        interval_counter = 0
         perc = 0
         for entry_tree in entries_list:
             entries = parse_japanese_entry(entry_tree)
             for entry in entries:
-                upsert_japanese_entry(client, entry)
+                interval_counter += 1
+                if upsert and interval_counter % interval == 0:
+                    upsert_japanese_entry(client, entry)
             if i == 0:
                 perc += 1
                 print(

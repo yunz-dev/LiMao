@@ -24,11 +24,11 @@ ChineseScraper = DictionaryScraper(
 )
 
 JapaneseScraper = DictionaryScraper(
-    source="https://example.com/dictionaries/english.txt",
-    protocol="http",
-    file_type="txt",
+    source="ftp://ftp.edrdg.org/pub/Nihongo//JMdict_e.gz",
+    protocol="ftp",
+    file_type="xml",
     zip_type="gz",
-    file_name="english_dictionary.txt",
+    file_name="JMdict_e",
     interval=500,  # for dev
     upsert=True,
 )
