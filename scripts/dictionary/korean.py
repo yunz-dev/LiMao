@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-"""
-A script to parse dictionary entries from a Korean YAML file,
-validate them, and upsert them into a Supabase database table
-using a modular, function-based approach, with enhanced CLI output.
-"""
-
-import argparse
 import os
 import sys
 from typing import List, Optional
@@ -389,7 +381,7 @@ def parse_korean_yml(upsert: bool, interval: int, file_path: str):
     )
     preview_count = 0
     for i, item in enumerate(yaml_data):
-        if preview_count >= 5:  # Display first 3 entries
+        if preview_count >= 15:  # Display first 3 entries
             console.log("[dim]... (truncated)[/dim]", style="dim")
             break
 
