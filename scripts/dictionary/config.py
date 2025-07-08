@@ -34,11 +34,11 @@ JapaneseScraper = DictionaryScraper(
 )
 
 KoreanScraper = DictionaryScraper(
-    source="https://example.com/dictionaries/english.txt",
+    source="https://raw.githubusercontent.com/mhagiwara/cc-kedict/refs/heads/master/kedict.yml",
     protocol="http",
-    file_type="txt",
-    zip_type="gz",
-    file_name="english_dictionary.txt",
+    file_type="yml",
+    zip_type="none",
+    file_name="kedict.yml",
     interval=500,  # for dev
     upsert=True,
 )
