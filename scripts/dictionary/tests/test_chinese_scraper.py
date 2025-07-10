@@ -1,6 +1,5 @@
 import sys
 import os
-import pytest
 from unittest.mock import patch, MagicMock, mock_open
 from io import StringIO
 

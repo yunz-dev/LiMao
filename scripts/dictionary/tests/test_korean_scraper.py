@@ -1,6 +1,9 @@
-import os, sys, tempfile, pytest, yaml
-from unittest.mock import Mock, patch, MagicMock, mock_open
-from typing import List, Optional
+import os
+import sys
+import tempfile
+import pytest
+import yaml
+from unittest.mock import Mock, patch, MagicMock
 from pydantic import ValidationError
 from rich.console import Console
 from io import StringIO
