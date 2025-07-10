@@ -20,3 +20,45 @@ SUPABASE_KEY=ADD_YOUR_OWN_SUPABASE_SERVICE_ROLE_KEY_HERE
 - run `pip install -r requirements.txt` and `python3 main.py` in `/scripts/dictionary` in order to populate the database
 - yipeee
 - you can find the database at `http://localhost:54323` (typically)
+
+### Language Scrapers Overview
+- download dictionary data from open sources (like cc-cedict and jmdict)
+- decompress (.gz) or read raw data directly (.yml)
+- parse entries into pydantic models
+- upsert each entry into supabase database (table)
+
+## Chinese Scraper
+- processes CC-CEDICT format entries:
+    - traditional
+    - simplified
+    - definition 1
+    - definition 2
+- every entry has to be has something in it
+- compiles into table with entries and is upserted:
+    - traditional
+    - simplified
+    - pronunciation
+    - definitions
+
+## Korean Scraper
+- processes CC-KEDICT format entries:
+    - word
+    - romaja
+    - pos
+    - defs
+    - notes, conj, syns, tags, etc. (metadata)
+- normalises data type to fit parse expected data type and compiles into table with same
+  entries and is upserted - each entry except word being optional
+
+## Japanese Scraper
+- processes JMDict format entries:
+    - kanji
+    - kana
+    - senses
+- normalises data type to fit parse expected data type (ensures kana is present,
+  joins definitions into a list, etc.)
+- compiles into table with entries and is upserted:
+    - word
+    - readings
+    - alt forms
+    - definitions
