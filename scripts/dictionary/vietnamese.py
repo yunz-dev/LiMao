@@ -367,8 +367,7 @@ def parse_vietnamese_entry(entry_str: str) -> Optional[VietnameseEntry]:
         # Case: It starts with "(number)"
         numbered_def_pattern = re.compile(r'\(\d+\)\s*(.*?)(?=\s*\(\d+\)|$)')
         extracted_defs = numbered_def_pattern.findall(raw_defs)
-        definitions = [d.strip() for d in extracted_defs if d.strip()]
-        
+        definitions = [d.strip('; ').strip() for d in extracted_defs if d.strip()]        
     else:
         # Case: It starts with "(number)"
         if raw_defs:
