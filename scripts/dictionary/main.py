@@ -3,6 +3,7 @@ import sys  # Import sys for clean exits
 from chinese import main as update_chinese_dictionary
 from japanese import main as update_japanese_dictionary
 from korean import main as update_korean_dictionary
+from vietnamese import main as update_vietnamese_dictionary
 from rich.console import Console
 
 # Initialize the Rich Console for all output
@@ -72,6 +73,23 @@ def main():
             style="red",
         )
         console.log("[bold red]Korean update failed.[/bold red]", style="orange3")
+
+    console.print("\n")  # Add a newline for spacing between dictionary outputs
+
+    # --- Update Vietnamese Dictionary ---
+    console.rule("[bold blue]Updating Vietnamese Dictionary[/bold blue]")
+    try:
+        console.log("Calling [cyan]update_vietnamese_dictionary()[/cyan]...")
+        update_vietnamese_dictionary()
+        console.log(
+            "[bold green]✅ Vietnamese Dictionary update completed successfully.[/bold green]"
+        )
+    except Exception as e:
+        console.log(
+            f"[bold red]❌ Error updating Vietnamese Dictionary:[/bold red] {e}",
+            style="red",
+        )
+        console.log("[bold red]Vietnamese update failed.[/bold red]", style="orange3")
 
     console.rule("[bold magenta]All Dictionary Updates Finished[/bold magenta]")
     console.log(f"Process finished at: [green]{console.get_datetime()}[/green]")

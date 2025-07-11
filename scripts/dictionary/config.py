@@ -42,3 +42,13 @@ KoreanScraper = DictionaryScraper(
     interval=1,
     upsert=True,
 )
+
+VietnameseScraper = DictionaryScraper(
+    source="http://www.denisowski.org/Vietnamese/vnedict.txt",
+    protocol="http",
+    file_type="txt",
+    zip_type="none",
+    file_name="vnedict.txt",
+    interval=1,
+    upsert=True,
+)
