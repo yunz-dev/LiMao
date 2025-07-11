@@ -246,7 +246,7 @@ def parse_Vietnamese_txt(upsert: bool, interval: int, file_path: str):
                     progress.update(parsing_task, advance=1)
                     processed_count += 1
 
-                    if line.strip().startswith("#"):  # Skip comment lines
+                    if line.strip().startswith("#") or i == 0:  # Skip comment lines
                         skipped_count += 1
                         progress.update(parsing_task, skipped_count=skipped_count)
                         continue
