@@ -78,7 +78,7 @@ def main():
         sys.exit(1)
 
     # --- Step 2: Unzip the file ---
-    unzipped_path = downloaded_path  # Initialize for cleanup
+    unzipped_path = downloaded_path
     if zip_type == "gz":
         console.log(
             "\n[bold yellow]Step 2:[/bold yellow] [bold blue]Unzipping file...[/bold blue]"
@@ -88,9 +88,8 @@ def main():
             console.log(
                 "[bold red]File unzipping failed. Exiting.[/bold red]", style="red"
             )
-            os.remove(downloaded_path)  # Clean up downloaded .gz file
+            os.remove(downloaded_path)
             sys.exit(1)
-        # Clean up the .gz file after successful unzipping
         try:
             os.remove(downloaded_path)
             console.log(
@@ -109,7 +108,7 @@ def main():
         console.log(
             "[bold red]Exiting due to unsupported zip type.[/bold red]", style="red"
         )
-        sys.exit(1)  # Exit if zip_type is not 'gz'
+        sys.exit(1)
 
     # --- Step 3: Parse and upsert data ---
     console.log(
@@ -179,7 +178,7 @@ def parse_definitions(senses: List[Element]) -> List[str]:
 
         definition_text = gloss.text.strip() if gloss.text else ""
         if not definition_text:
-            continue  # Skip empty definitions
+            continue
 
         # Append part-of-speech (pos)
         poses = sense.findall("pos")
@@ -215,9 +214,8 @@ def parse_japanese_entry_from_xml_element(
     readings = parse_readings(entry_element.findall("r_ele"))
     definitions = parse_definitions(entry_element.findall("sense"))
 
-    # If no definitions or no kebs/readings, it's not a valid entry
     if not definitions or (not kebs and not readings):
-        return None  # Indicate unparseable entry
+        return None
 
     res: List[JapaneseEntry] = []
 
@@ -230,10 +228,9 @@ def parse_japanese_entry_from_xml_element(
 
     for i, primary_form in enumerate(primary_forms):
         # Determine alt_forms based on the current primary_form
-        # If kebs exist, alt_forms are other kebs. If only readings, other readings.
-        if kebs:  # Primary forms are kanji (kebs)
+        if kebs:
             alt_forms = [f for idx, f in enumerate(kebs) if idx != i] or None
-        else:  # Primary forms are readings (readings, if kebs was None)
+        else:
             alt_forms = [f for idx, f in enumerate(readings) if idx != i] or None
 
         try:
@@ -241,7 +238,7 @@ def parse_japanese_entry_from_xml_element(
                 word=primary_form,
                 readings=readings
                 if kebs
-                else None,  # Only store readings if there was a kanji word
+                else None,
                 alt_forms=alt_forms,
                 definitions=definitions,
             )
@@ -261,7 +258,7 @@ def parse_japanese_entry_from_xml_element(
 
     return (
         res if res else None
-    )  # Return list if any entries were successfully parsed, else None
+    )
 
 
 def upsert_japanese_entry(supabase: Client, entry: JapaneseEntry) -> bool:
@@ -279,7 +276,7 @@ def upsert_japanese_entry(supabase: Client, entry: JapaneseEntry) -> bool:
     try:
         entry_dict = entry.model_dump(
             exclude_none=True
-        )  # exclude_none for cleaner data
+        )
 
         response = supabase.table("japanese_entries").upsert(entry_dict).execute()
 
@@ -304,7 +301,6 @@ def parse_japanese_xml(upsert: bool, interval: int, file_path: str):
         interval (int): Only process and (if upsert is True) upsert every `interval` *parsed JapaneseEntry objects*.
         file_path (str): The path to the XML file to parse.
     """
-    # Check for file existence
     console.log(
         f"\n[bold blue]Attempting to process file:[/bold blue] [green]{file_path}[/green]"
     )
@@ -313,7 +309,6 @@ def parse_japanese_xml(upsert: bool, interval: int, file_path: str):
             f"[bold red]❌ Error: The file '[yellow]{file_path}[/yellow]' was not found.[/bold red]",
             style="red",
         )
-        # Clean up downloaded file if parsing fails at this stage
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
@@ -327,7 +322,6 @@ def parse_japanese_xml(upsert: bool, interval: int, file_path: str):
                 )
         return  # Return instead of exit to allow main() to clean up if needed
 
-    # Load and parse the XML file
     entries_list = []  # List of XML <entry> elements
     with Status(
         "[bold green]Loading and parsing XML file...", spinner="dots", console=console
@@ -393,7 +387,6 @@ def parse_japanese_xml(upsert: bool, interval: int, file_path: str):
                     )
             return
 
-    # --- Preview and Confirmation ---
     console.log(
         f"\n[bold yellow]Previewing file entries:[/bold yellow] [green]{file_path}[/green]"
     )
@@ -434,7 +427,7 @@ def parse_japanese_xml(upsert: bool, interval: int, file_path: str):
 
     if raw_xml_entry_index < len(
         entries_list
-    ):  # If we didn't go through all entries for preview
+    ):
         console.log("[dim]... (truncated)[/dim]", style="dim")
 
     response = Confirm.ask("[bold yellow]Do these entries look correct?[/bold yellow]")
@@ -478,13 +471,11 @@ def parse_japanese_xml(upsert: bool, interval: int, file_path: str):
             )
             sys.exit(1)
 
-    processed_count = 0  # Total JapaneseEntry objects processed
-    upserted_count = 0  # JapaneseEntry objects successfully upserted
-    skipped_interval_count = 0  # JapaneseEntry objects skipped by interval
-    parse_error_count = (
-        0  # Raw XML entries that failed to yield *any* valid JapaneseEntry
-    )
-    upsert_failure_count = 0  # JapaneseEntry objects that failed to upsert to DB
+    processed_count = 0
+    upserted_count = 0
+    skipped_interval_count = 0
+    parse_error_count = 0  # Raw XML entries that failed to yield *any* valid JapaneseEntry
+    upsert_failure_count = 0
 
     console.log(
         "\n[bold blue]Starting parsing and (optional) upserting...[/bold blue]"
@@ -503,7 +494,7 @@ def parse_japanese_xml(upsert: bool, interval: int, file_path: str):
         "•",
         TextColumn(
             "XML Parse Errors: [red]{task.fields[xml_parse_errors]}[/red]"
-        ),  # XML level parse errors
+        ),
         "•",
         TextColumn("Upsert Failures: [red]{task.fields[upsert_failure_count]}[/red]"),
         "•",
@@ -524,7 +515,7 @@ def parse_japanese_xml(upsert: bool, interval: int, file_path: str):
         )
 
         for i, entry_xml_element in enumerate(entries_list):
-            progress.update(parsing_task, advance=1)  # Advance for each raw XML entry
+            progress.update(parsing_task, advance=1)
 
             parsed_entries_from_xml = parse_japanese_entry_from_xml_element(
                 entry_xml_element, i + 1
@@ -533,9 +524,9 @@ def parse_japanese_xml(upsert: bool, interval: int, file_path: str):
             if parsed_entries_from_xml:
                 for j_entry in (
                     parsed_entries_from_xml
-                ):  # Iterate over each JapaneseEntry from this XML element
+                ):
                     processed_count += (
-                        1  # Increment total processed for each Pydantic model
+                        1
                     )
 
                     if upsert and processed_count % interval == 0:
@@ -561,17 +552,16 @@ def parse_japanese_xml(upsert: bool, interval: int, file_path: str):
                                     justify="left",
                                 )
                         else:
-                            skipped_interval_count += 1  # Count as skipped if upsert intended but client missing
+                            skipped_interval_count += 1
                             console.log(
                                 f"[bold orange3]Warning:[/bold orange3] Skipping upsert for '{j_entry.word}' because Supabase client is not initialized.",
                                 style="orange3",
                             )
                     else:
                         skipped_interval_count += (
-                            1  # Count as skipped if not upserting or not interval
+                            1
                         )
 
-                    # Update progress bar fields after processing each JapaneseEntry
                     progress.update(
                         parsing_task,
                         processed_count=processed_count,
@@ -580,7 +570,6 @@ def parse_japanese_xml(upsert: bool, interval: int, file_path: str):
                         upsert_failure_count=upsert_failure_count,
                     )
             else:
-                # If the XML entry failed to parse into ANY valid JapaneseEntry models
                 parse_error_count += 1
                 progress.update(parsing_task, xml_parse_errors=parse_error_count)
                 # Error message already logged by parse_japanese_entry_from_xml_element if parsing issue
@@ -596,7 +585,6 @@ def parse_japanese_xml(upsert: bool, interval: int, file_path: str):
             upsert_failure_count=upsert_failure_count,
         )
 
-    # Final Summary (consistent with Chinese/Korean output)
     console.log("\n[bold green]Parsing and upserting complete![/bold green]")
     console.log(
         f"  [white]Total XML entries scanned:[/white] [cyan]{len(entries_list)}[/cyan]"
@@ -617,7 +605,6 @@ def parse_japanese_xml(upsert: bool, interval: int, file_path: str):
         f"  [white]JapaneseEntry objects with upsert failures:[/white] [red]{upsert_failure_count}[/red]"
     )
 
-    # Clean up the unzipped file
     if os.path.exists(file_path):
         try:
             os.remove(file_path)

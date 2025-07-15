@@ -62,8 +62,7 @@ def main():
             source, f"{file_name}.gz" if zip_type == "gz" else file_name
         )
     elif protocol == "ftp":
-        # Using the placeholder for FTP. You'd need to uncomment and ensure download_file_ftp exists in utils
-        # from utils import download_file_ftp
+        # Using the placeholder for FTP. Uncomment to enable ftp support.
         # downloaded_path = download_file_ftp(source, f"{file_name}.gz" if zip_type == "gz" else file_name)
         console.log(
             "[bold red]Error:[/bold red] FTP protocol support is currently commented out or not fully implemented.",
@@ -94,9 +93,8 @@ def main():
             console.log(
                 "[bold red]File unzipping failed. Exiting.[/bold red]", style="red"
             )
-            os.remove(downloaded_path)  # Clean up downloaded .gz file
+            os.remove(downloaded_path)
             exit(1)
-        # Clean up the .gz file after successful unzipping
         try:
             os.remove(downloaded_path)
             console.log(
@@ -157,20 +155,18 @@ def parse_chinese_txt(upsert: bool, interval: int, file_path: str):
         )
         return
 
-    # --- File preview and confirmation ---
     console.log(
         f"\n[bold yellow]Previewing file:[/bold yellow] [green]{file_path}[/green]"
     )
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             for i, line in enumerate(f):
-                if i < 15:  # Displaying first 15 lines
+                if i < 15:
                     console.log(f"[dim]Line {i+1}:[/dim] {line.strip()}", style="dim")
                 else:
                     console.log("[dim]... (truncated)[/dim]", style="dim")
-                    break  # Stop reading after 15 lines for preview
+                    break
 
-            # Use rich.prompt.Confirm for a better interactive experience
             response = Confirm.ask(
                 "[bold yellow]Does this file look correct?[/bold yellow]"
             )
@@ -192,7 +188,6 @@ def parse_chinese_txt(upsert: bool, interval: int, file_path: str):
     client = None
     if upsert:
         try:
-            # setup_supabase_client already uses rich.status.Status so it's good
             client = setup_supabase_client()
         except ValueError as e:
             console.log(f"[bold red]Supabase setup failed:[/bold red] {e}", style="red")
@@ -209,7 +204,6 @@ def parse_chinese_txt(upsert: bool, interval: int, file_path: str):
 
     try:
         with open(file_path, "r", encoding="utf-8") as f:
-            # Get total lines for an accurate progress bar
             total_lines = sum(1 for _ in f)
             f.seek(0)  # Reset file pointer to the beginning
 
@@ -255,8 +249,6 @@ def parse_chinese_txt(upsert: bool, interval: int, file_path: str):
                         entry = parse_chinese_entry(line)
                         if entry:
                             if upsert and client:
-                                # Removed the transient Status here.
-                                # The main progress bar will handle the overall visual update.
                                 response = upsert_chinese_entry(client, entry)
                                 if response:
                                     upserted_count += 1
@@ -284,7 +276,7 @@ def parse_chinese_txt(upsert: bool, interval: int, file_path: str):
                                 style="orange3",
                             )
                     else:
-                        skipped_count += 1  # Count as skipped if not within interval
+                        skipped_count += 1
                         progress.update(parsing_task, skipped_count=skipped_count)
 
                 # Final update for the progress bar fields to ensure they reflect final counts
@@ -324,7 +316,6 @@ def parse_chinese_txt(upsert: bool, interval: int, file_path: str):
         # To get more detail, you could print the full traceback:
         # console.print_exception(show_locals=True)
     finally:
-        # Clean up the unzipped file
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
@@ -357,8 +348,6 @@ def parse_chinese_entry(entry_str: str) -> Optional[ChineseEntry]:
     match = pattern.match(entry_str.strip())
 
     if not match:
-        # This function is called within a loop that tracks errors, so no console.log here.
-        # The calling function handles logging the parsing error.
         return None
 
     traditional, simplified, pronunciation, defs_string = match.groups()
@@ -373,8 +362,6 @@ def parse_chinese_entry(entry_str: str) -> Optional[ChineseEntry]:
         )
         return entry_object
     except ValidationError:
-        # This function is called within a loop that tracks errors, so no console.log here.
-        # The calling function handles logging the validation error.
         return None
 
 
@@ -395,13 +382,9 @@ def upsert_chinese_entry(supabase: Client, entry: ChineseEntry) -> dict:
     try:
         # Convert the Pydantic model to a dictionary before sending to Supabase
         entry_dict = entry.model_dump()
-
-        # The .upsert() method handles the INSERT or UPDATE logic automatically
         response = supabase.table("chinese_entries").upsert(entry_dict).execute()
 
         if response.data:
-            # This function is called inside a Progress bar loop,
-            # so direct console.log for success is usually avoided to prevent output flickering.
             return response.data[0]
         else:
             # In cases where no data is returned but no error is raised by Supabase,
@@ -410,9 +393,6 @@ def upsert_chinese_entry(supabase: Client, entry: ChineseEntry) -> dict:
             return {}
 
     except Exception:
-        # Error messages for upsert failures are now logged from the calling function (parse_chinese_txt)
-        # to ensure they appear without interfering with the progress bar.
-        # We simply return an empty dict to signal failure.
         return {}
 
 

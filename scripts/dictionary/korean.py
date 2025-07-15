@@ -6,8 +6,6 @@ import yaml
 from config import KoreanScraper
 from dotenv import load_dotenv
 
-# --- Install required packages ---
-# pip install pydantic supabase pyyaml rich
 from pydantic import BaseModel, ValidationError
 from rich.console import Console
 from rich.progress import (
@@ -17,19 +15,18 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
-from rich.prompt import Confirm  # Used for interactive prompts
-from rich.status import Status  # Used for initial setup spinners
+from rich.prompt import Confirm
+from rich.status import Status
 from utils import (
     download_file,
     setup_supabase_client,
     log_config_loaded
-)  # Assuming these are from your previous utility file
+)
 
 from supabase import (
     Client,
-)  # Keep create_client for setup_supabase_client internally
+)
 
-# Initialize the Rich Console for all output
 console = Console()
 
 
@@ -59,7 +56,7 @@ def main():
         console.log(
             "[bold red]Exiting due to configuration error.[/bold red]", style="red"
         )
-        sys.exit(1)  # Use sys.exit for clean exits
+        sys.exit(1)
 
     # --- Step 1: Download the file ---
     console.log(
@@ -70,7 +67,7 @@ def main():
         downloaded_path = download_file(
             source, file_name
         )  # Assuming download_file handles file extension if needed
-    # elif protocol == "ftp": # Add FTP support if needed, using download_file_ftp from utils
+    # elif protocol == "ftp":
     #    downloaded_path = download_file_ftp(source, file_name)
     else:
         console.log(
@@ -86,14 +83,12 @@ def main():
         console.log("[bold red]File download failed. Exiting.[/bold red]", style="red")
         sys.exit(1)
 
-    # --- Step 2: Handle unzipping (or lack thereof) ---
+    # --- Step 2: Unzip the file if necessary ---
     if zip_type == "none":
         console.log(
             "\n[bold yellow]Step 2:[/bold yellow] [bold blue]No unzipping required (zip_type='none').[/bold blue]"
         )
     else:
-        # If you were to add zip support, you'd integrate unzip_gz_file or similar here.
-        # For now, it just exits if zip_type is not 'none'.
         console.log(
             f"[bold red]Error:[/bold red] Unsupported zip type '{zip_type}'. Only 'none' is supported for now.",
             style="red",
@@ -108,7 +103,6 @@ def main():
         "\n[bold yellow]Step 3:[/bold yellow] [bold blue]Parsing file and upserting data...[/bold blue]"
     )
     if file_type == "yml":
-        # Pass the path to the downloaded file directly
         parse_korean_yml(upsert, interval, downloaded_path)
     else:
         console.log(
@@ -123,14 +117,13 @@ def main():
     console.rule("[bold blue]Korean Scraper Finished[/bold blue]")
 
 
-# --- 2. Pydantic Data Model ---
 class KoreanEntry(BaseModel):
     """A Pydantic model for a Korean dictionary entry."""
 
     word: str
     romaja: Optional[str] = None
     pos: Optional[str] = None
-    defs: Optional[List[str]] = None  # This will hold the extracted definition strings
+    defs: Optional[List[str]] = None
     conj: Optional[List[str]] = None
     notes: Optional[List[str]] = None
     syns: Optional[List[str]] = None
@@ -152,18 +145,13 @@ def upsert_korean_entry(supabase: Client, entry: KoreanEntry) -> bool:
     try:
         # Convert the Pydantic model to a dictionary suitable for Supabase
         entry_dict = entry.model_dump(exclude_none=True)
-
-        # The .upsert() method handles the INSERT or UPDATE logic automatically
-        # based on the table's primary key.
         response = supabase.table("korean_entries").upsert(entry_dict).execute()
 
-        # Check if Supabase returned data (indicating success, though not strictly an error if empty)
         if response.data:
             return True
         else:
             # Supabase might return empty data if no change was made (e.g., identical entry)
             # or if the upsert was successful but didn't return the full row.
-            # Treat this as success for simplicity here.
             return True
 
     except Exception as e:
@@ -186,22 +174,18 @@ def parse_korean_entry_from_yaml_item(
         Optional[KoreanEntry]: A validated KoreanEntry object, or None if validation fails.
     """
     try:
-        # --- NEW: Handle boolean conversion for 'romaja' ---
         # The YAML parser may interpret unquoted 'on' as the boolean True.
         # This converts it back to a string (e.g., True -> "True") to prevent validation errors.
         if "romaja" in item and isinstance(item.get("romaja"), bool):
             item["romaja"] = str(item["romaja"])
 
-        # --- Handle str to List[str] conversion ---
         # These fields should be lists, but might be a single string in the YAML.
-        # This converts them to a list with a single item if they are a string.
         fields_to_normalize = ["notes", "defs", "conj", "syns", "tags"]
         for field in fields_to_normalize:
             if field in item and isinstance(item.get(field), str):
                 item[field] = [item[field]]
 
-        # Transformation: Extract 'def' strings to match the Pydantic model
-        # This handles the case where 'defs' is a list of dictionaries.
+        # Extract definitions from list of dicts
         if "defs" in item and isinstance(item.get("defs"), list):
             new_defs = []
             for d in item["defs"]:
@@ -211,10 +195,8 @@ def parse_korean_entry_from_yaml_item(
                     new_defs.append(d)
             item["defs"] = new_defs
 
-        # Validation
         korean_entry = KoreanEntry(**item)
         return korean_entry
-
     except ValidationError as e:
         word_for_log = item.get("word", f"entry #{line_num}")
         console.log(
@@ -231,7 +213,6 @@ def parse_korean_entry_from_yaml_item(
         return None
 
 
-# --- 4. Main Orchestration Function ---
 def parse_korean_yml(upsert: bool, interval: int, file_path: str):
     """
     Main function to parse arguments, process the YAML file, and upsert entries.
@@ -246,7 +227,6 @@ def parse_korean_yml(upsert: bool, interval: int, file_path: str):
     supabase = None
     if upsert:
         try:
-            # setup_supabase_client itself now uses rich.status.Status
             supabase = setup_supabase_client()
             console.log("[bold green]Supabase client connected.[/bold green]")
         except ValueError as e:
@@ -266,7 +246,6 @@ def parse_korean_yml(upsert: bool, interval: int, file_path: str):
             console.log("[bold red]Exiting.[/bold red]", style="red")
             sys.exit(1)
 
-    # Check for file existence
     console.log(
         f"\n[bold blue]Attempting to process file:[/bold blue] [green]{file_path}[/green]"
     )
@@ -275,7 +254,6 @@ def parse_korean_yml(upsert: bool, interval: int, file_path: str):
             f"[bold red]❌ Error: The file '[yellow]{file_path}[/yellow]' was not found.[/bold red]",
             style="red",
         )
-        # Clean up downloaded file if parsing fails at this stage
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
@@ -306,7 +284,6 @@ def parse_korean_yml(upsert: bool, interval: int, file_path: str):
                     "[bold red]❌ Error: YAML root must be a list of dictionary entries.[/bold red]",
                     style="red",
                 )
-                # Clean up downloaded file
                 if os.path.exists(file_path):
                     try:
                         os.remove(file_path)
@@ -331,7 +308,6 @@ def parse_korean_yml(upsert: bool, interval: int, file_path: str):
             console.log(
                 f"[bold red]❌ Error parsing YAML file: {e}[/bold red]", style="red"
             )
-            # Clean up downloaded file
             if os.path.exists(file_path):
                 try:
                     os.remove(file_path)
@@ -353,7 +329,6 @@ def parse_korean_yml(upsert: bool, interval: int, file_path: str):
                 f"[bold red]❌ An unexpected error occurred while loading YAML: {e}[/bold red]",
                 style="red",
             )
-            # Clean up downloaded file
             if os.path.exists(file_path):
                 try:
                     os.remove(file_path)
@@ -367,13 +342,12 @@ def parse_korean_yml(upsert: bool, interval: int, file_path: str):
                     )
             return
 
-    # --- Preview and Confirmation ---
     console.log(
         f"\n[bold yellow]Previewing file entries:[/bold yellow] [green]{file_path}[/green]"
     )
     preview_count = 0
     for i, item in enumerate(yaml_data):
-        if preview_count >= 15:  # Display first 3 entries
+        if preview_count >= 15:
             console.log("[dim]... (truncated)[/dim]", style="dim")
             break
 
@@ -389,18 +363,12 @@ def parse_korean_yml(upsert: bool, interval: int, file_path: str):
                 f"[dim]Entry {i+1}:[/dim] [red]Failed to parse for preview. Skipping.[/red]",
                 style="dim red",
             )
-            # Don't increment preview_count if parsing failed for a preview item, to get 3 successful previews
-            # unless the list is too short.
-            # If you want to show *any* 3 lines regardless of parse success, increment here.
-            # For now, we'll try to get 3 *parsed* entries.
-            pass
 
     response = Confirm.ask("[bold yellow]Do these entries look correct?[/bold yellow]")
     if not response:
         console.log(
             "[bold red]Operation cancelled by user. Exiting.[/bold red]", style="red"
         )
-        # Clean up downloaded file
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
@@ -414,11 +382,10 @@ def parse_korean_yml(upsert: bool, interval: int, file_path: str):
                 )
         sys.exit(1)
 
-    # Process and upsert each entry one by one
     success_count = 0
-    skipped_interval_count = 0  # Added for consistency with Chinese script
-    parse_error_count = 0  # Separate count for parsing errors
-    upsert_failure_count = 0  # Separate count for upsert errors
+    skipped_interval_count = 0
+    parse_error_count = 0
+    upsert_failure_count = 0
 
     total_entries = len(yaml_data)
     console.log(
@@ -438,11 +405,11 @@ def parse_korean_yml(upsert: bool, interval: int, file_path: str):
         "•",
         TextColumn(
             "Parse Errors: [red]{task.fields[parse_error_count]}[/red]"
-        ),  # Updated column
+        ),
         "•",
         TextColumn(
             "Upsert Failures: [red]{task.fields[upsert_failure_count]}[/red]"
-        ),  # New column
+        ),
         "•",
         TimeElapsedColumn(),
         "•",
@@ -455,27 +422,23 @@ def parse_korean_yml(upsert: bool, interval: int, file_path: str):
             processed_count=0,
             upserted_count=0,
             skipped_count=0,
-            parse_error_count=0,  # Initial values for new fields
+            parse_error_count=0,
             upsert_failure_count=0,
         )
 
         for i, item in enumerate(yaml_data):
-            # Update processed count regardless of skip/parse status
             progress.update(parsing_task, advance=1, processed_count=i + 1)
 
-            # Check if current entry should be skipped based on interval
             if i % interval != 0:
                 skipped_interval_count += 1
                 progress.update(parsing_task, skipped_count=skipped_interval_count)
                 continue
 
-            # Parse the entry using the helper function
             korean_entry = parse_korean_entry_from_yaml_item(item, i + 1)
 
             if korean_entry:
-                # Entry parsed successfully
                 if upsert:
-                    if supabase:  # Ensure supabase client is initialized
+                    if supabase:
                         try:
                             upsert_success = upsert_korean_entry(supabase, korean_entry)
                             if upsert_success:
@@ -524,21 +487,19 @@ def parse_korean_yml(upsert: bool, interval: int, file_path: str):
                         parsing_task, upserted_count=success_count
                     )  # Use upserted_count as a general "processed successfully" count if not upserting
             else:
-                # Entry parsing failed (error already logged by parse_korean_entry_from_yaml_item)
                 parse_error_count += 1
                 progress.update(parsing_task, parse_error_count=parse_error_count)
 
         # Final update to ensure progress bar reflects all counts
         progress.update(
             parsing_task,
-            processed_count=total_entries,  # Ensure processed count reaches total
+            processed_count=total_entries,
             upserted_count=success_count,
             skipped_count=skipped_interval_count,
             parse_error_count=parse_error_count,
             upsert_failure_count=upsert_failure_count,
         )
 
-    # Final Summary (consistent with Chinese output)
     console.log("\n[bold green]Parsing and upserting complete![/bold green]")
     console.log(
         f"  [white]Total entries processed:[/white] [cyan]{total_entries}[/cyan]"
@@ -556,7 +517,6 @@ def parse_korean_yml(upsert: bool, interval: int, file_path: str):
         f"  [white]Entries with upsert failures:[/white] [red]{upsert_failure_count}[/red]"
     )
 
-    # Clean up the downloaded file
     if os.path.exists(file_path):
         try:
             os.remove(file_path)
@@ -570,8 +530,6 @@ def parse_korean_yml(upsert: bool, interval: int, file_path: str):
             )
 
 
-# --- 5. Script Entry Point ---
 if __name__ == "__main__":
-    # Load environment variables for Supabase (usually done at the top level of your script)
     load_dotenv()
     main()
